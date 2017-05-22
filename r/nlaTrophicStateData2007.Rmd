@@ -1,0 +1,320 @@
+---
+title: "nlaTrophicStateData2007"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+
+#NOTE: This script must be run in 32bit R
+
+knitr::opts_chunk$set(echo = TRUE)
+options("stringsAsFactors" = FALSE) 
+library(RODBC)
+library(tidyverse)
+library(caret)
+```
+
+```{r multiplotFunctions, include=FALSE}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+
+## Introduction
+
+We are interested in using the SPARROW model to estimate how proposed changes to the air rules will affect the trophic states of lakes on the east coast from Maine to Florida. An east coast SPARROW model has been developed that incorporates CMAQ (Community Multi-scale Air Quality Model; see http://tinyurl.com/gv8k9q9) estimates of nitrogen inputs from atmospheric sources.  The CMAQ model also provides predicted reductions in atmospheric nitrogen inputs expected to occur under current regulations.  Since the East Coast model is parameterized with the CMAQ nitrogen inputs we can look at how reductions will affect nitrogen loading to flow lines all along the east coast.  Predictions of current and future changes in nitrogen loads to flowlines can be aggregated to lakes to estimate total loads and in-lake concentrations of nitrogen. The expectation is that these changes in nitrogen inputs will lead to changes in the trophic structure of the lakes.  The conventional understanding, however, is that phosphorus is more often the limiting nutrient in lakes and therefore it is questionable whether nitrogen reductions will have a major effect.  We cannot deny the importance of phosphorus as a limiting nutrient but increasingly researchers are demonstrating that increased nitrogen loads (especially atmospheric inputs) are strongly impacting lakes leading to increased eutrophication (see Conely et al 2009; http://science.sciencemag.org/content/323/5917/1014.full).  Therefore, there is justification for looking at changes in trophic state associated with nitrogen load reductions.
+
+Trophic state is a measure of the productivity of a lake. Ideally, we'd like to measure the annual net primary production of a lake to determine its trophic state but this can be costly and technically challenging.  In the absence of detailed data on a lake's primary production we often depend on trophic state indices to estimate trophic state.  The Carlson (1977) trophic state indices are widely accepted as the best estimates of lake trophic state. These indices use a scale from 0 to 100 (mostly) to define trophic state based on Secchi Depth, Chlorophyll a, or Total Phosphorus.  Kratzer and Brezonik (1981) developed a trophic state index that it is compatible with the Carlson indices based on Total Nitrogen.  All four indices are nicely summarized on Carlson's secchi dip in website (http://www.secchidipin.org/index.php/monitoring-methods/trophic-state-equations/).  The general forumulas for the indices are:
+
+* Trophic State Index for Secchi Depth(TSI_S) = 60 – 14.41 * ln(secchi_depth)  
+    
+* Trophic State Index for Chlorophyll (TSI_C) = (9.81 * ln(chlorophyll)) + 30.6
+
+* Trophic State Index for Phosphorus (TSI_P) = (14.42 * ln(total_phosphorus)) + 4.15 
+
+* Trophic State Index for Nitrogen (TSI_N) = 54.45 + (14.43 * ln(total_nitrogen * .001) 
+    - Note:  The natural logrithm (ln) is used in the formulas; sechi_depth is in meters, and chlorophyll, total phosphorus, and total nitrogen are in $\mu$g/l.
+
+The trophic state index is a continuous linear measure of lake trophic state but it can be used to assign lakes to standard trophic state categories. On the secchi dip in webpage Carlson provides some threshold values for assigning categories using the indices. The thresholds are a little fuzzy with some intermediate states.  Below are the threshold values:
+
+* Oligotrophic: TSI $\leq$ 40
+* Mesotrophic: TSI $>$ 40 and TSI $\leq$ 50
+* Eutrophic: TSI $>$ 50 and TSI $\leq$ 70
+* Hypereutrophic: TSI $>$ 70
+
+Assigning trophic states can be useful for communication purposes since the discreet classes are generally understood and conform fairly well to our cultural aesthetics. In general, there is pretty good agreement on the assignment of trophic state among all four indices.  However, we can expect some variation due to lake specific  conditions (e.g., lakes with unusual physical-chemical characteristics) and also as an artifact of using defined thresholds to categorize a continuous variable (measurement error and chance variation will affect categorization at or near threshold cutoffs). An alternative is to just use the trophic state index as a continuous measure of trophic state.  
+
+Before undertaking the task of estimating changes in nitrogen loadings to lakes it will be useful to explore whether the trophic state index for nitrogen will give us interesting information. From the 2007 National Lake Assessment we have measured values of secchi depth, chlorophyll a, total phosphorus, and total nitrogen for over 1000 lakes across the 48 coterminous United States.  From these data we can calculate the four trophic state indices (TSI_S, TSI_C, TSI_P, and TSI_N) and then compare and contrast them.  Carlson (1977) argued that TSI_S would be the best measure of primary production because water clarity is directly affected by algal (but not SAV) productivity.  He used TSI_S to construct the first trophic state index and then scaled the TSI_C and TSI_P to this index. The TSI_N is scaled to the original Carlson indices (Kratzer and Brezonik 1981).  So, instead of looking at all possible comparisons we will just compare the performance and distributions of TSI_C, TSI_P, and TSI_N to TSI_S.
+
+Comparisons: 
+
+* Summarize and compare the distributions of the 4 indices.
+* Do a linear comparison of TSI_C, TSI_P, and TSI_N to TSI_S with estimates of slope and r^2^ 
+* Compare assignments to trophic state categories among indices.
+
+## Data Steps
+
+* Download the NLA 2007 NTL ($\mu$g/l), PTL ($\mu$g/l), CHLA ($\mu$g/l), SECMEAN (m), and subjective trophic state data from the WaterbodyDatabase.mdb
+    - restrict to VISIT_NO==1 and LAKE_SAMP=='Target_Sampled'
+* calculate trophic state indices (TSI_S, TSI_C, TSI_P, and TSI_N)
+* assign lakes to trophic state categories for each TSI
+
+```{r data, include=FALSE}
+
+#get the data
+con <- odbcConnectAccess("L:/Public/Milstead_Lakes/WaterbodyDatabase/WaterbodyDatabase.mdb")
+
+All <- sqlQuery(con, "
+SELECT tblNLA_WaterQualityData.SITE_ID, tblNLA_WaterQualityData.NTL, tblNLA_WaterQualityData.PTL, tblNLA_WaterQualityData.CHLA, tblNLA_WaterQualityData.SECMEAN, tblNLA_VisualAssessment.TROPHIC_STATE
+FROM tblNLA_WaterQualityData INNER JOIN tblNLA_VisualAssessment ON (tblNLA_WaterQualityData.VISIT_NO = tblNLA_VisualAssessment.VISIT_NO) AND (tblNLA_WaterQualityData.SITE_ID = tblNLA_VisualAssessment.SITE_ID)
+WHERE (((tblNLA_VisualAssessment.VISIT_NO)=1) AND ((tblNLA_VisualAssessment.LAKE_SAMP)='Target_Sampled'));
+")
+close(con)
+str(All)
+
+#calculate TSI indices 
+tsi<-mutate(All,
+       tsi_s=60-14.41*log(SECMEAN),
+       tsi_c=30.6+9.81*log(CHLA),
+       tsi_p=4.15+14.42*log(PTL),
+       tsi_n=54.45+14.43*log(NTL*.001))
+
+#trophic state tsi thresholds
+ml<-40
+el<-50
+hl<-70
+Min<-min(tsi$tsi_s,tsi$tsi_c,tsi$tsi_p,tsi$tsi_n,na.rm=TRUE)
+Max<-max(tsi$tsi_s,tsi$tsi_c,tsi$tsi_p,tsi$tsi_n,na.rm=TRUE)
+thr<-c(Min,ml,el,hl,Max)
+
+
+# assign tsi trophic states
+tsi<-mutate(tsi, 
+              ts_s=cut(tsi_s,breaks=thr,include.lowest=TRUE,right=TRUE,labels=c('oligo','meso','eu','hyper')),
+              ts_c=cut(tsi_c,breaks=thr,include.lowest=TRUE,right=TRUE,labels=c('oligo','meso','eu','hyper')),
+              ts_p=cut(tsi_p,breaks=thr,include.lowest=TRUE,right=TRUE,labels=c('oligo','meso','eu','hyper')),
+              ts_n=cut(tsi_n,breaks=thr,include.lowest=TRUE,right=TRUE,labels=c('oligo','meso','eu','hyper')))
+
+#cut(c(39,40,41,49,50,51,69,70,71),breaks=thr,include.lowest=TRUE,right=TRUE,labels=c('oligo','meso','eu','hyper'))
+```
+
+
+## Analysis
+
+###Summarize and compare the distributions of the 4 indices
+
+```{r dist, include=TRUE, echo=FALSE, warning=FALSE}
+#data summaries
+summary(tsi[,c('tsi_s','tsi_c','tsi_p','tsi_n')])
+
+
+#plot TSI histograms
+xmax<-with(tsi,max(tsi_s,tsi_c,tsi_p,tsi_n,na.rm=TRUE))
+xmin<-with(tsi,min(tsi_s,tsi_c,tsi_p,tsi_n,na.rm=TRUE))
+ymax<-175
+
+ts_s<-ggplot(tsi, aes(x=tsi_s))+geom_histogram(binwidth=5, colour="black", fill="white")+ggtitle("TS: Secchi")+xlim(xmin,xmax)+ylim(0,ymax)
+ts_c<-ggplot(tsi, aes(x=tsi_c))+geom_histogram(binwidth=5, colour="black", fill="white")+ggtitle("TS: Chla")+xlim(xmin,xmax)+ylim(0,ymax)
+ts_p<-ggplot(tsi, aes(x=tsi_p))+geom_histogram(binwidth=5, colour="black", fill="white")+ggtitle("TS: TP")+xlim(xmin,xmax)+ylim(0,ymax)
+ts_n<-ggplot(tsi, aes(x=tsi_n))+geom_histogram(binwidth=5, colour="black", fill="white")+ggtitle("TS: TN")+xlim(xmin,xmax)+ylim(0,ymax)
+
+multiplot(ts_s,ts_c,ts_p,ts_n,cols=2)
+```
+
+* The TSI_S has a slightly higher values for mean and median.
+* TSI_N has the lowest values for mean and median
+* All 4 distributions are more or less normal; there is slight right skew to the TSI_P
+* With the exception of TSI_P the distributions are superficially similar
+
+###Linear comparison of TSI_Chlorophyll to TSI_Secchi 
+
+```{r lmC, include=TRUE, echo=FALSE, warning=FALSE}
+#write a function to produce the plots
+plotTS<-function(Y=tsi$tsi_c, Lab='Trophic State Chlorophyll'){
+  #get linear model coefficients
+    aa<-lm(Y~tsi_s,data=tsi)
+    a<-summary(aa)
+    adjR<-round(a$adj.r.squared,4)
+    pp<-round(anova(aa)$'Pr(>F)'[1],4)
+      p<-ifelse(pp<.0001,'P < .0001',paste('P =',pp))
+    b<-round(a$coefficients[1,1],2)
+    m<-round(a$coefficients[2,1],2)
+  #plot
+    gg<-ggplot(data=tsi)+
+        geom_point(mapping=aes(x=tsi_s,y=Y),color='blue')+
+          geom_abline(slope=m,intercept=b,color='orange',lwd=1.5)+  #add the regression line
+      annotate("text",x=5,y=122,hjust=0,label = paste("adjR^2 == ",adjR),parse=TRUE)+
+      annotate("text",x=5,y=117,hjust=0,label = p)+
+      annotate("text",x=5,y=112,hjust=0,label = paste('slope =',m))+
+        labs(x = "Trophic State Secchi",y=Lab)+
+        scale_x_continuous(expand=c(0,0),limits=c(0,xmax))+
+      scale_y_continuous(expand=c(0,0),limits=c(0,xmax))
+  out<-list(gg,adjR,pp,b,m)
+return(out)}
+
+pc<-plotTS(tsi$tsi_c,'Trophic State Chlorophyll')
+pc[[1]]
+#plotTS(tsi$tsi_p,'Trophic State Phosphorus')
+#plotTS(tsi$tsi_n,'Trophic State Nitrogen')
+
+```
+
+* There is a fairly stong relationship between TSI_Chlorophyll and TSI_Secchi
+* The slope of the regression line is `r pc[[5]]` with an adjR^2^ of `r pc[[2]]` 
+
+###Linear comparison of TSI_Phosphorus to TSI_Secchi 
+
+```{r lmP, include=TRUE, echo=FALSE, warning=FALSE}
+pp<-plotTS(tsi$tsi_p,'Trophic State Phosphorus')
+pp[[1]]
+
+#plotTS(tsi$tsi_n,'Trophic State Nitrogen')
+
+```
+
+* There is a fairly stong relationship between TSI_Phosphorus and TSI_Secchi
+* The slope of the regression line is `r pp[[5]]` with an adjR^2^ of `r pp[[2]]` 
+
+###Linear comparison of TSI_Nitrogen to TSI_Secchi 
+
+```{r lmN, include=TRUE, echo=FALSE, warning=FALSE}
+pn<-plotTS(tsi$tsi_n,'Trophic State Nitrogen')
+pn[[1]]
+
+```
+
+* There is a fairly stong relationship between TSI_Nitrogen and TSI_Secchi
+* The slope of the regression line is `r pn[[5]]` with an adjR^2^ of `r pn[[2]]` 
+
+### Compare assignments to trophic state categories among indices.
+
+* Confusion matrix for comparing Trophic State Assignment for Chlorophyll and Secchi
+
+```{r confuseC, include=TRUE, echo=FALSE, warning=FALSE}
+cfC<-confusionMatrix(table(Chlorophyll=tsi$ts_c,Secchi=tsi$ts_s))
+cfC
+aC<-round(cfC$overall[1],2)
+
+```
+
+* Confusion matrix for comparing Trophic State Assignment for Phosphorus and Secchi
+
+```{r confuseP, include=TRUE, echo=FALSE, warning=FALSE}
+cfP<-confusionMatrix(table(Phosporus=tsi$ts_p,Secchi=tsi$ts_s))
+cfP
+aP<-round(cfP$overall[1],2)
+
+```
+
+* Confusion matrix for comparing Trophic State Assignment for Nitrogen and Secchi
+
+```{r confuseN, include=TRUE, echo=FALSE, warning=FALSE}
+cfN<-confusionMatrix(table(Nitrogen=tsi$ts_n,Secchi=tsi$ts_s))
+cfN
+aN<-round(cfN$overall[1],2)
+
+```
+
+*  If we accept secchi as the standard then overall accuracy is highest for TSI_cholorophyll (accuracy=`r aC`).  The next highest is TSI_phosphorus (accuracy=`r aP`).  TSI_Nitrogen had the lowest accuracy (accuracy=`r aN`).
+
+* we can also compare Trophic State Assignment graphically and we see for all three indices (Chlorophyll, Phosphorus, and Nitrogen) most of the deviations are for the next highest or lowest trophic state.  Related to this we see that most of the deviations occur at the pinch points (intersections of threshold values).
+    - In the figures below the vertical and horizontal grey lines show the threshold values.  Pinch point occur where the x and y thresholds of the same value cross.  For the ts_dif subtract the numeric value for the assigned trophic state (oligo=1, meso=2, eu=3 and hyper=4) for secchi and from the numeric value for Trophic State for the comparison and take the absolute value.  This shows the step differences between the predictions.
+    
+* Graphical comparison of Trophic State Assignment for Chlorophyll and Secchi
+
+```{r graphC, include=TRUE, echo=FALSE, warning=FALSE}
+#plot by whether ts_n and ts_s agree
+
+plotDif<-function(Y=tsi$tsi_c,Z=tsi$ts_c, Lab='Trophic State Chlorophyll'){
+  #get dif
+  ts_dif<-factor(abs(as.numeric(tsi$ts_s)-as.numeric(Z)))  #how much do the TS categories differ 0=no dif.
+
+  #plot
+gg<-ggplot(data=tsi)+
+    geom_point(mapping=aes(x=tsi_s,y=Y,color=ts_dif))+
+    geom_vline(xintercept=c(ml,el,hl),size=1.5,color='grey')+
+    geom_hline(yintercept=c(ml,el,hl),size=1.5,color='grey')+
+    scale_color_manual(values=c("blue", "green", "orange","red"))+
+    labs(x = "Trophic State Secchi",y=Lab)+
+        scale_x_continuous(expand=c(0,0),limits=c(0,xmax))+
+      scale_y_continuous(expand=c(0,0),limits=c(0,xmax))
+return(gg)}  
+
+plotDif(tsi$tsi_c,tsi$ts_c,'Trophic State Chlorophyll')
+#plotDif(tsi$tsi_p,tsi$ts_p,'Trophic State Phosphorus')
+#plotDif(tsi$tsi_n,tsi$ts_n,'Trophic State Nitrogen')
+```
+
+* Graphical comparison of Trophic State Assignment for Phosphorus and Secchi
+
+```{r graphP, include=TRUE, echo=FALSE, warning=FALSE}
+plotDif(tsi$tsi_p,tsi$ts_p,'Trophic State Phosphorus')
+
+```
+
+* Graphical comparison of Trophic State Assignment for Nitrogen and Secchi
+
+```{r graphN, include=TRUE, echo=FALSE, warning=FALSE}
+
+plotDif(tsi$tsi_n,tsi$ts_n,'Trophic State Nitrogen')
+```
+
+## Conclusions
+
+* All four trophic state indices produce similar distributions of values.
+* The trophic state index for secchi is linearly related to the other three.  R^2^ are perhaps lower than we would like and the slopes deviate from 1 but overall they are acceptable.
+* If we assume that the Trophic State Index for Secchi is the most accurate then the second most accurate index is Chlorophyll followed by Phosphorus and Nitrogen.
+* My personal feeling is that any of the indices can be used to estimate trophic state but without some independent means to the "true" trophic state we can't really decide which is best.
+* Based on this limited anlysis I think we are justified in using the Trophic State Index for Nitrogen to look at changes in lake trophic structure that will result for changes in atmospheric deposition of nitrogen.
+
+## References
+
+* Carlson, R. E. 1977. A Trophic State Index for Lakes. Limnology and Oceanography 22(2): 361-369.
+
+* Conley, D. J., et al. 2009. Controlling Eutrophication: Nitrogen and Phosphorus. Science 323(5917): 1014-1015.
+
+* Kratzer, C.R. & P.L. Brezonik. 1981. A Carlson-type trophic state index for nitrogen in Florida lakes. Water. Res. Bull. 17: 713-715.
