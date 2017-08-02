@@ -12,18 +12,15 @@ options(stringsAsFactors = FALSE)
 library(knitr)
 library(tidyverse)
 library(haven)
+library(here) 
+library(tidyverse)
 
-read1<-function(dir='data/raw_data/',file='nla2012_waterchem_wide.csv'){
-  a<-tryCatch(read.csv(paste(dir,file,sep=''),sep=',',na.strings = c(""," ","NA","N/A")),warning = function(e) read.csv(paste('../',dir,file,sep=''),sep=',',na.strings = c(""," ","NA","N/A")))
-  return(a)
-}  
+ 
 ```
 
 ## Introduction
 
-## Introduction
-
-We are interested in using the SPARROW model to estimate how proposed changes to the air rules will affect the trophic states of lakes on the east coast from Maine to Florida. An east coast SPARROW model has been developed that incorporates CMAQ (Community Multi-scale Air Quality Model; see http://tinyurl.com/gv8k9q9) estimates of nitrogen inputs from atmospheric sources.  The CMAQ model also provides predicted reductions in atmospheric nitrogen inputs expected to occur under current regulations by 2025.  Since the East Coast model is parameterized with the CMAQ nitrogen inputs for 2002 we can look at how reductions will affect nitrogen loading to flow lines all along the east coast.  Predictions of 2002 and 2025 nitrogen loads to flowlines can be aggregated to lakes to estimate total loads and in-lake concentrations of nitrogen. The expectation is that these changes in nitrogen inputs will lead to changes in the trophic structure of the lakes.  The conventional understanding, however, is that phosphorus is more often the limiting nutrient in lakes and therefore it is questionable whether nitrogen reductions will have a major effect.  We cannot deny the importance of phosphorus as a limiting nutrient but increasingly researchers are demonstrating that increased nitrogen loads (especially atmospheric inputs) are strongly impacting lakes leading to increased eutrophication (see Conely et al 2009; http://science.sciencemag.org/content/323/5917/1014.full).  Therefore, there is justification for looking at changes in trophic state associated with nitrogen load reductions.
+We are interested in using the SPARROW model to estimate how proposed changes to the air rules will affect the trophic states of lakes on the east coast from Maine to Florida. An east coast SPARROW model has been developed that incorporates CMAQ (Community Multi-scale Air Quality Model; see http://tinyurl.com/gv8k9q9) estimates of nitrogen inputs from atmospheric sources.  The CMAQ model also provides predicted reductions in atmospheric nitrogen inputs expected to occur under current regulations by 2025.  Since the East Coast model is parameterized with the CMAQ nitrogen inputs for 2002 we can look at how reductions will affect nitrogen loading to flow lines all along the east coast.  Predictions of 2002 and 2025 nitrogen loads to flowlines can be aggregated to lakes to estimate total loads and in-lake concentrations of nitrogen. The expectation is that these changes in nitrogen inputs will lead to changes in the trophic structure of the lakes.  The conventional understanding, however, is that phosphorus is more often the limiting nutrient in lakes and therefore it is questionable whether nitrogen reductions will have a major effect.  We cannot deny the importance of phosphorus as a limiting nutrient but increasingly researchers are demonstrating that increased nitrogen loads (especially atmospheric inputs) are strongly impacting lakes leading to increased eutrophication (see Conely et al 2009; http://science.sciencemag.org/content/323/5917/1014.full).  Therefore, there is justification for looking at changes in trophic state associated with nitrogen load reductions
 
 Trophic state is a measure of the productivity of a lake. Ideally, we'd like to measure the annual net primary production of a lake to determine its trophic state but this can be costly and technically challenging.  In the absence of detailed data on a lake's primary production we often depend on trophic state indices to estimate trophic state.  The Carlson (1977) trophic state indices are widely accepted as the best estimates of lake trophic state. These indices use a scale from 0 to 100 (mostly) to define trophic state based on Secchi Depth, Chlorophyll a, or Total Phosphorus.  Kratzer and Brezonik (1981) developed a trophic state index that it is compatible with the Carlson indices based on Total Nitrogen.  All four indices are nicely summarized on Carlson's secchi dip in website (http://www.secchidipin.org/index.php/monitoring-methods/trophic-state-equations/).  The general forumula for the TSI for Nitrogen is:
 
@@ -38,6 +35,8 @@ The trophic state index is a continuous linear measure of lake trophic state but
 * Mesotrophic: TSI $>$ 40 and TSI $\leq$ 50
 * Eutrophic: TSI $>$ 50 and TSI $\leq$ 70
 * Hypereutrophic: TSI $>$ 70
+
+The TSI for nitrogen appears to be a reasonable predictor of lake tropic state.  We validated this claim by comparing trophic state indices for nitrogen, phosphorus, chlorophyll, and secchi depth using the 2007 National Lake Assessment data set (see: https://www.epa.gov/national-aquatic-resource-surveys/nla).  The results supported the use of TSI_N (see: https://github.com/willbmisled/east_coast_sparrow/blob/master/r/nlaTrophicStateData2007.Rmd)
 
 ## data sources
 
@@ -56,6 +55,8 @@ Good to talk with both of you as well,  and thanks for getting this going Rich.
 I've placed some files on the ftp depot ftp://ftpext.usgs.gov/pub/er/tn/nashville/Hoos/CMAQScenario_Simulations/   -  two separate SAS files,  each with the 'mass balance' postprocessing from the SPARROW run (2002 and 2025).    They should be visible about an hour from now.
  Because my postprocessing program does phosphorus at the same time you get that as a bonus in these   :)
 I still need to postprocess the  source share calculations for each lake  -   but you probably don't need that information for your analysis.
+
+NOTE: two updates to these files were received from Anne on 5/23/17
 
 
 
@@ -109,48 +110,70 @@ I still need to postprocess the  source share calculations for each lake  -   bu
 ## data steps
 
 * read the sas datafiles and convert to r data.frames
-* create a function to convert "TN_CONC_inlake" (mg/l) to trophic state
-* 
+* write a function to convert "TN_CONC_inlake" (mg/l) to trophic state 
+* join datasets, assign trophic state, and calc trophic state change 
+* write results to 'output/ec_sparrow_lake_tropic_state.csv'
 
-```{r analysis, include=FALSE, echo=FALSE, eval=TRUE}
-ec02<-read_sas('data/mrb1mrb2_massbalance_2002base.sas7bdat');dim(ec02) #41566    42
-ec25<-read_sas('data/mrb1mrb2_massbalance_2025.sas7bdat');dim(ec25) #41566    42
+```{r analysis, include=FALSE, echo=FALSE, eval=TRUE,cache=TRUE}
+ec02<-read_sas(here('data/mrb1mrb2_massbalance_2002base.sas7bdat'));dim(ec02) #41566    42
+ec25<-read_sas(here('data/mrb1mrb2_massbalance_2025.sas7bdat'));dim(ec25) #41566    42
 
 summary(ec02$TN_CONC_inlake)
-          Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-       0.00077   0.09780   0.17820   0.35320   0.36140 111.20000 
+          #Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+       #0.00077   0.09780   0.17820   0.35320   0.36140 111.20000 
        
 summary(ec25$TN_CONC_inlake)
-          Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
-       0.00077   0.09780   0.17820   0.35320   0.36140 111.20000 
+         # Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
+       #0.00068   0.08115   0.15270   0.31280   0.30780 111.10000
 
 
 
-
+#join datasets, assign trophic state, and calc trophic state change
 assignTS<-function(x){  #x is a vector of TN conventration in mg/l
   tsi<-54.45+(14.43*log(x)) #convert TN to TSI
   thresholds<-c(min(tsi),40,50,70,max(tsi)) #define thresholds
-  ts<-cut(tsi,thresholds,include.lowest=TRUE,labels=c('oligo','meso','eu','hyper')) #assign the TS
+  ts<-cut(tsi,thresholds,include.lowest=TRUE,labels=c('oligo','meso','eu','hyper'),ordered_result = TRUE) #assign the TS
   return(ts)
 }
   #test<-c(39,40,41,49,50,51,69,70,71) #TSI values to test
   #testMGL<-exp((test-54.45)/14.43) #convert the TSI to TN mg/l
   #assignTS(testMGL) #the expected return is c(oligo,oligo,meso,meso,meso,eu,eu,eu,hyper)
 
+ec_ts<-select(ec02,WBRchCd,tn02=TN_CONC_inlake)%>%inner_join(select(ec25,WBRchCd,tn25=TN_CONC_inlake))%>%
+    mutate(ts02=assignTS(tn02),ts25=assignTS(tn25),ts_chg=as.numeric(ts02)-as.numeric(ts25))
 
-ts02<-assignTS(ec02$TN_CONC_inlake)
-ts25<-assignTS(ec25$TN_CONC_inlake)
+#output
+write.csv(ec_ts,here('output/ec_sparrow_lake_tropic_state.csv'),row.names=FALSE)
+```
 
-table(ts02)
-table(ts25)
+## Results
+
+* The 2002 and 2025 in-lake concentations of nitrogen (mg/l) were estimated for 41,566 lakes along the east coast.
+* The estimated 2025 in-lake nitrogen concentrations were slightly lower than the estimated values for 2002.
+* The results are summarized below.
+
+```{r summ, include=TRUE, echo=FALSE, eval=TRUE}
+summary(ec_ts$tn02)
+summary(ec_ts$tn25)
+
+table(ec_ts$ts_chg)
+
+group_by(ec_ts,ts02)%>%count(ts25)
 
 
 
 ```
 
+```{r ts_tbl, include=TRUE, echo=FALSE, eval=TRUE}
+a<-as.data.frame(table(ec_ts$ts02))%>%rename(ts2002=Freq)
+b<-as.data.frame(table(ec_ts$ts25))%>%rename(ts2025=Freq)
+ts_tbl<-inner_join(a,b)%>%mutate(ts_chg=ts2025-ts2002)%>%rename(ts=Var1)
 
 
+```
 
+* These nitrogen estimates were converted to Trophic State categories and compared
+* All of the changes in tro
 
 
 
