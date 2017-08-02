@@ -2,7 +2,7 @@
 title: "east_coast_sparrow"
 author: "Bryan Milstead"
 date: "`r format(Sys.time(), '%d %B %Y')`"
-output: html_document
+output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
@@ -61,8 +61,11 @@ NOTE: two updates to these files were received from Anne on 5/23/17
 
 
 ### data definitions (see: "data/README_definitionofattributes_massbalancereservoirs_MRB1MRB2.xlsx")
+
+* each file contains the following fields with data for 41,566 lakes.
+
 **Attribute** | **Definition**
--------------------------- | --------------------------------------------------------------------------------------------
+------------------------------------------------- | --------------------------------------------------------------------------------------------
 **WBRchCd** | Waterbody Reachcode,  unique identifier for a reservoir or lake.  Most of these corresponds with the attribute 'REACHCODE' in the shapefile NHDwaterbody except where manual fixes were made (documented in the SAS program that populates the SPARROW input data  set); in a few cases a new reachcode was assigned by Anne Hoos in 2010
 **invhload_aggreg** | Inverse of the hydraulic load aggregated for lake (i.e. inverse of hload_aggreg, see below for calculation);  in days/meter - this is the value reported in DS 820 as "Residence time, d/m" 
 **TN_arealloading_in_perflush** | (misnomer,  should be named TN_LOAD_in_perflush) Tributary inflow load to lake per flushing rate (i.e. per hydraulic load, or could express as inflow load multiplied by inverse hydraulic load),  in kg*d/m, calculated as TN_LOAD_inflow / hload_aggreg - this is the value reported in DS 820 as "Load from watershed per hydraulic flushing rate of receiving waterbody"
@@ -146,6 +149,26 @@ ec_ts<-select(ec02,WBRchCd,tn02=TN_CONC_inlake)%>%inner_join(select(ec25,WBRchCd
 write.csv(ec_ts,here('output/ec_sparrow_lake_tropic_state.csv'),row.names=FALSE)
 ```
 
+* "ec_sparrow_lake_tropic_state.csv" is avaiable here: https://github.com/willbmisled/east_coast_sparrow/blob/master/output/ec_sparrow_lake_tropic_state.csv
+
+* The file contains estimates of total nitrogen and trophic state designations for the two time periods (2002 & 2025) for 41,566 lakes.
+* The dataset also indicates whether trophic state is estimated to change between the years.
+* The lakes can be joined to NHDplus with the field "WBRchCd".
+
+### data definitions for "ec_sparrow_lake_tropic_state.csv"
+
+* each file contains tye following fields with data for 41,566 lakes.
+
+**Attribute** | *Definition**
+-------------------------- | --------------------------------------------------------------------------------------------
+**WBRchCd** | Waterbody Reachcode,  unique identifier for a reservoir or lake.  Most of these corresponds with the attribute 'REACHCODE' in the shapefile NHDwaterbody except where manual fixes were made (documented in the SAS program that populates the SPARROW input data  set); in a few cases a new reachcode was assigned by Anne Hoos in 2010. Note this was used to join the original two datasets.
+**tn02** | Estimated In-Lake Nitrogen Concentration of reservoir  (mg/L), calculated as TN_arealloading_outload / hload /=\* (1 - RetentCoeff_Nurnberg) (equation corrected 10/3/2014) for year=2002.  The name of this field in the source dataset ("mrb1mrb2_massbalance_2002base.sas7bdat") was: "**TN_CONC_inlake**"
+**tn25** | Estimated In-Lake Nitrogen Concentration of reservoir  (mg/L), calculated as TN_arealloading_outload / hload /=\* (1 - RetentCoeff_Nurnberg) (equation corrected 10/3/2014) for year=2025.  The name of this field in the source dataset ("mrb1mrb2_massbalance_2025base.sas7bdat") was: "**TN_CONC_inlake**"
+**ts02** | Predicted trophic state for the 2002 lakes based on "tn02";"oligo"="oligotrophic", "meso"="mesotrophic", "eu"="eutrophic", and, "hyper"="hypertrophic".
+**ts25** | Predicted trophic state for the 2025 lakes based on "tn25";"oligo"="oligotrophic", "meso"="mesotrophic", "eu"="eutrophic", and, "hyper"="hypertrophic".
+**ts_chg** | Indicated whether the predicted lake trophic state changed between 2002 and 2025; ts_chg=0 indicates the lakes were assigned the same trophic state in both years; ts_chg=1 indicates the predicted trophic state for 2025 was less eutrophic by 1 trophic state category compared to 2002.  No lakes became more eutrophic or changed more than one trophic state category. 
+
+
 ## Results
 
 * The 2002 and 2025 in-lake concentations of nitrogen (mg/l) were estimated for 41,566 lakes along the east coast.
@@ -153,29 +176,20 @@ write.csv(ec_ts,here('output/ec_sparrow_lake_tropic_state.csv'),row.names=FALSE)
 * The results are summarized below.
 
 ```{r summ, include=TRUE, echo=FALSE, eval=TRUE}
+print("Summary of the 2002 TN data")
 summary(ec_ts$tn02)
+print("Summary of the 2025 TN data")
 summary(ec_ts$tn25)
 
-table(ec_ts$ts_chg)
-
-group_by(ec_ts,ts02)%>%count(ts25)
-
-
-
 ```
+
+* The field "ts_chg" shows which lakes changed in predicted trophic state between 2002 and 2025.  Some lakes stayed the same (ts_chg=0) and some became less eutrophic by one trophic state level (ts_chg=0; e.g., a lake that was eutrophic in 2002 was mesotrophic in 2025).  No lakes became more eutrophic and none changed by more than 1 trophic state class. A total of `r sum(ec_ts$ts_chg)` lakes "improved" in 2025.
+
+* It is more interesting, however, to look at the details of the tropic state changes.  The table below shows all possible changes (or not) and the number of lakes in each category:
 
 ```{r ts_tbl, include=TRUE, echo=FALSE, eval=TRUE}
-a<-as.data.frame(table(ec_ts$ts02))%>%rename(ts2002=Freq)
-b<-as.data.frame(table(ec_ts$ts25))%>%rename(ts2025=Freq)
-ts_tbl<-inner_join(a,b)%>%mutate(ts_chg=ts2025-ts2002)%>%rename(ts=Var1)
-
-
+as.data.frame(group_by(ec_ts,ts02)%>%count(ts25))
 ```
-
-* These nitrogen estimates were converted to Trophic State categories and compared
-* All of the changes in tro
-
-
 
 
 

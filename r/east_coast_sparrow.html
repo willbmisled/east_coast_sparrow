@@ -126,7 +126,7 @@ $(document).ready(function () {
 
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
-<p>We are interested in using the SPARROW model to estimate how proposed changes to the air rules will affect the trophic states of lakes on the east coast from Maine to Florida. An east coast SPARROW model has been developed that incorporates CMAQ (Community Multi-scale Air Quality Model; see <a href="http://tinyurl.com/gv8k9q9" class="uri">http://tinyurl.com/gv8k9q9</a>) estimates of nitrogen inputs from atmospheric sources. The CMAQ model also provides predicted reductions in atmospheric nitrogen inputs expected to occur under current regulations by 2025. Since the East Coast model is parameterized with the CMAQ nitrogen inputs for 2002 we can look at how reductions will affect nitrogen loading to flow lines all along the east coast. Predictions of 2002 and 2025 nitrogen loads to flowlines can be aggregated to lakes to estimate total loads and in-lake concentrations of nitrogen. The expectation is that these changes in nitrogen inputs will lead to changes in the trophic structure of the lakes. The conventional understanding, however, is that phosphorus is more often the limiting nutrient in lakes and therefore it is questionable whether nitrogen reductions will have a major effect. We cannot deny the importance of phosphorus as a limiting nutrient but increasingly researchers are demonstrating that increased nitrogen loads (especially atmospheric inputs) are strongly impacting lakes leading to increased eutrophication (see Conely et al 2009; <a href="http://science.sciencemag.org/content/323/5917/1014.full" class="uri">http://science.sciencemag.org/content/323/5917/1014.full</a>). Therefore, there is justification for looking at changes in trophic state associated with nitrogen load reductions.</p>
+<p>We are interested in using the SPARROW model to estimate how proposed changes to the air rules will affect the trophic states of lakes on the east coast from Maine to Florida. An east coast SPARROW model has been developed that incorporates CMAQ (Community Multi-scale Air Quality Model; see <a href="http://tinyurl.com/gv8k9q9" class="uri">http://tinyurl.com/gv8k9q9</a>) estimates of nitrogen inputs from atmospheric sources. The CMAQ model also provides predicted reductions in atmospheric nitrogen inputs expected to occur under current regulations by 2025. Since the East Coast model is parameterized with the CMAQ nitrogen inputs for 2002 we can look at how reductions will affect nitrogen loading to flow lines all along the east coast. Predictions of 2002 and 2025 nitrogen loads to flowlines can be aggregated to lakes to estimate total loads and in-lake concentrations of nitrogen. The expectation is that these changes in nitrogen inputs will lead to changes in the trophic structure of the lakes. The conventional understanding, however, is that phosphorus is more often the limiting nutrient in lakes and therefore it is questionable whether nitrogen reductions will have a major effect. We cannot deny the importance of phosphorus as a limiting nutrient but increasingly researchers are demonstrating that increased nitrogen loads (especially atmospheric inputs) are strongly impacting lakes leading to increased eutrophication (see Conely et al 2009; <a href="http://science.sciencemag.org/content/323/5917/1014.full" class="uri">http://science.sciencemag.org/content/323/5917/1014.full</a>). Therefore, there is justification for looking at changes in trophic state associated with nitrogen load reductions</p>
 <p>Trophic state is a measure of the productivity of a lake. Ideally, we’d like to measure the annual net primary production of a lake to determine its trophic state but this can be costly and technically challenging. In the absence of detailed data on a lake’s primary production we often depend on trophic state indices to estimate trophic state. The Carlson (1977) trophic state indices are widely accepted as the best estimates of lake trophic state. These indices use a scale from 0 to 100 (mostly) to define trophic state based on Secchi Depth, Chlorophyll a, or Total Phosphorus. Kratzer and Brezonik (1981) developed a trophic state index that it is compatible with the Carlson indices based on Total Nitrogen. All four indices are nicely summarized on Carlson’s secchi dip in website (<a href="http://www.secchidipin.org/index.php/monitoring-methods/trophic-state-equations/" class="uri">http://www.secchidipin.org/index.php/monitoring-methods/trophic-state-equations/</a>). The general forumula for the TSI for Nitrogen is:</p>
 <p>TSI(TN) = 54.45 + 14.43 ln(TN)</p>
 <ul>
@@ -142,6 +142,7 @@ $(document).ready(function () {
 <li>Eutrophic: TSI <span class="math inline">\(&gt;\)</span> 50 and TSI <span class="math inline">\(\leq\)</span> 70</li>
 <li>Hypereutrophic: TSI <span class="math inline">\(&gt;\)</span> 70</li>
 </ul>
+<p>The TSI for nitrogen appears to be a reasonable predictor of lake tropic state. We validated this claim by comparing trophic state indices for nitrogen, phosphorus, chlorophyll, and secchi depth using the 2007 National Lake Assessment data set (see: <a href="https://www.epa.gov/national-aquatic-resource-surveys/nla" class="uri">https://www.epa.gov/national-aquatic-resource-surveys/nla</a>). The results supported the use of TSI_N (see: <a href="https://github.com/willbmisled/east_coast_sparrow/blob/master/r/nlaTrophicStateData2007.Rmd" class="uri">https://github.com/willbmisled/east_coast_sparrow/blob/master/r/nlaTrophicStateData2007.Rmd</a>)</p>
 </div>
 <div id="data-sources" class="section level2">
 <h2>data sources</h2>
@@ -152,6 +153,9 @@ $(document).ready(function () {
 <p>NOTE: two updates to these files were received from Anne on 5/23/17</p>
 <div id="data-definitions-see-datareadme_definitionofattributes_massbalancereservoirs_mrb1mrb2.xlsx" class="section level3">
 <h3>data definitions (see: “data/README_definitionofattributes_massbalancereservoirs_MRB1MRB2.xlsx”)</h3>
+<ul>
+<li>each file contains the following fields with data for 41,566 lakes.</li>
+</ul>
 <table>
 <colgroup>
 <col width="22%"></col>
@@ -346,8 +350,56 @@ $(document).ready(function () {
 <li>read the sas datafiles and convert to r data.frames</li>
 <li>write a function to convert “TN_CONC_inlake” (mg/l) to trophic state</li>
 <li>join datasets, assign trophic state, and calc trophic state change</li>
-<li>write results to ‘output/ec_sparrow_lake_tropic_state.csv’</li>
+<li><p>write results to ‘output/ec_sparrow_lake_tropic_state.csv’</p></li>
+<li><p>“ec_sparrow_lake_tropic_state.csv” is avaiable here: <a href="https://github.com/willbmisled/east_coast_sparrow/blob/master/output/ec_sparrow_lake_tropic_state.csv" class="uri">https://github.com/willbmisled/east_coast_sparrow/blob/master/output/ec_sparrow_lake_tropic_state.csv</a></p></li>
+<li>The file contains estimates of total nitrogen and trophic state designations for the two time periods (2002 &amp; 2025) for 41,566 lakes.</li>
+<li>The dataset also indicates whether trophic state is estimated to change between the years.</li>
+<li><p>The lakes can be joined to NHDplus with the field “WBRchCd”.</p></li>
 </ul>
+<div id="data-definitions-for-ec_sparrow_lake_tropic_state.csv" class="section level3">
+<h3>data definitions for “ec_sparrow_lake_tropic_state.csv”</h3>
+<ul>
+<li>each file contains tye following fields with data for 41,566 lakes.</li>
+</ul>
+<table>
+<colgroup>
+<col width="22%"></col>
+<col width="77%"></col>
+</colgroup>
+<thead>
+<tr class="header">
+<th><strong>Attribute</strong></th>
+<th>*Definition**</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>WBRchCd</strong></td>
+<td>Waterbody Reachcode, unique identifier for a reservoir or lake. Most of these corresponds with the attribute ‘REACHCODE’ in the shapefile NHDwaterbody except where manual fixes were made (documented in the SAS program that populates the SPARROW input data set); in a few cases a new reachcode was assigned by Anne Hoos in 2010. Note this was used to join the original two datasets.</td>
+</tr>
+<tr class="even">
+<td><strong>tn02</strong></td>
+<td>Estimated In-Lake Nitrogen Concentration of reservoir (mg/L), calculated as TN_arealloading_outload / hload /=* (1 - RetentCoeff_Nurnberg) (equation corrected 10/3/2014) for year=2002. The name of this field in the source dataset (“mrb1mrb2_massbalance_2002base.sas7bdat”) was: “<strong>TN_CONC_inlake</strong>”</td>
+</tr>
+<tr class="odd">
+<td><strong>tn25</strong></td>
+<td>Estimated In-Lake Nitrogen Concentration of reservoir (mg/L), calculated as TN_arealloading_outload / hload /=* (1 - RetentCoeff_Nurnberg) (equation corrected 10/3/2014) for year=2025. The name of this field in the source dataset (“mrb1mrb2_massbalance_2025base.sas7bdat”) was: “<strong>TN_CONC_inlake</strong>”</td>
+</tr>
+<tr class="even">
+<td><strong>ts02</strong></td>
+<td>Predicted trophic state for the 2002 lakes based on “tn02”;“oligo”=“oligotrophic”, “meso”=“mesotrophic”, “eu”=“eutrophic”, and, “hyper”=“hypertrophic”.</td>
+</tr>
+<tr class="odd">
+<td><strong>ts25</strong></td>
+<td>Predicted trophic state for the 2025 lakes based on “tn25”;“oligo”=“oligotrophic”, “meso”=“mesotrophic”, “eu”=“eutrophic”, and, “hyper”=“hypertrophic”.</td>
+</tr>
+<tr class="even">
+<td><strong>ts_chg</strong></td>
+<td>Indicated whether the predicted lake trophic state changed between 2002 and 2025; ts_chg=0 indicates the lakes were assigned the same trophic state in both years; ts_chg=1 indicates the predicted trophic state for 2025 was less eutrophic by 1 trophic state category compared to 2002. No lakes became more eutrophic or changed more than one trophic state category.</td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>
@@ -356,17 +408,17 @@ $(document).ready(function () {
 <li>The estimated 2025 in-lake nitrogen concentrations were slightly lower than the estimated values for 2002.</li>
 <li>The results are summarized below.</li>
 </ul>
+<pre><code>## [1] &quot;Summary of the 2002 TN data&quot;</code></pre>
 <pre><code>##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 ##   0.00077   0.09780   0.17820   0.35320   0.36140 111.20000</code></pre>
+<pre><code>## [1] &quot;Summary of the 2025 TN data&quot;</code></pre>
 <pre><code>##      Min.   1st Qu.    Median      Mean   3rd Qu.      Max. 
 ##   0.00068   0.08115   0.15270   0.31280   0.30780 111.10000</code></pre>
-<pre><code>## 
-##     0     1 
-## 39181  2385</code></pre>
-<pre><code>## # A tibble: 7 x 3
-## # Groups:   ts02 [4]
-##    ts02  ts25     n
-##   &lt;ord&gt; &lt;ord&gt; &lt;int&gt;
+<ul>
+<li><p>The field “ts_chg” shows which lakes changed in predicted trophic state between 2002 and 2025. Some lakes stayed the same (ts_chg=0) and some became less eutrophic by one trophic state level (ts_chg=0; e.g., a lake that was eutrophic in 2002 was mesotrophic in 2025). No lakes became more eutrophic and none changed by more than 1 trophic state class. A total of 2385 lakes “improved” in 2025.</p></li>
+<li><p>It is more interesting, however, to look at the details of the tropic state changes. The table below shows all possible changes (or not) and the number of lakes in each category:</p></li>
+</ul>
+<pre><code>##    ts02  ts25     n
 ## 1 oligo oligo 31341
 ## 2  meso oligo  1587
 ## 3  meso  meso  4104
@@ -374,11 +426,6 @@ $(document).ready(function () {
 ## 5    eu    eu  3400
 ## 6 hyper    eu    44
 ## 7 hyper hyper   336</code></pre>
-<pre><code>## Joining, by = &quot;Var1&quot;</code></pre>
-<ul>
-<li>These nitrogen estimates were converted to Trophic State categories and compared</li>
-<li>All of the changes in tro</li>
-</ul>
 </div>
 
 
