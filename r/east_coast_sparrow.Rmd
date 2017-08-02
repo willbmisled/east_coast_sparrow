@@ -38,6 +38,8 @@ The trophic state index is a continuous linear measure of lake trophic state but
 
 The TSI for nitrogen appears to be a reasonable predictor of lake tropic state.  We validated this claim by comparing trophic state indices for nitrogen, phosphorus, chlorophyll, and secchi depth using the 2007 National Lake Assessment data set (see: https://www.epa.gov/national-aquatic-resource-surveys/nla).  The results supported the use of TSI_N (see: https://github.com/willbmisled/east_coast_sparrow/blob/master/r/nlaTrophicStateData2007.Rmd)
 
+This document is available here: https://github.com/willbmisled/east_coast_sparrow/blob/master/r/east_coast_sparrow.Rmd
+
 ## data sources
 
 The 2002 base conditions ('data/mrb1mrb2_massbalance_2002base.sas7bdat') and the 2025 predictions ('data/mrb1mrb2_massbalance_2025.sas7bdat') were provided by Anne Hoos in SAS format.  See email message below:
